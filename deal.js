@@ -174,4 +174,7 @@ boot().catch((e) => {
   console.error(e);
   setBusy(false);
   toast(e.message || "Couldn't load this deal.", true);
+  $("panel-title").textContent = "Couldn't load this deal";
+  $("panel-id").textContent = e.message || "Unknown error — check the browser console for details.";
+  $("deal-shell").classList.remove("hidden");
 });
