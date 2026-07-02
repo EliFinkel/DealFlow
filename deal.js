@@ -66,7 +66,10 @@ async function renderFiles() {
   try {
     files = await store.listFiles(current);
   } catch (e) {
-    hint.textContent = "Couldn't load files: " + e.message;
+    const missingBucket = /404|not found|object-not-found|bucket/i.test(e.message || "");
+    hint.textContent = missingBucket
+      ? "File attachments aren't available yet — Firebase Storage isn't enabled on this project."
+      : "Couldn't load files: " + e.message;
     return;
   }
   if (files.length === 0) hint.textContent = "No files attached.";
@@ -165,9 +168,11 @@ async function boot() {
   }
 
   fillForm(current);
-  await renderFiles();
+  // Show the deal immediately. Files load in the background so a slow or
+  // unavailable Storage bucket can never blank the page.
   $("deal-shell").classList.remove("hidden");
   fieldInput("company").focus();
+  renderFiles().catch((e) => console.error("file load failed", e));
 }
 
 boot().catch((e) => {

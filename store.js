@@ -14,6 +14,11 @@ const FirebaseStore = (() => {
   async function init() {
     db = firebase.firestore();
     storage = firebase.storage();
+    // Storage may be unprovisioned (it needs the Blaze plan). Without this,
+    // a missing bucket makes the SDK retry for ~2 minutes before failing;
+    // cap it so file calls fail fast instead of hanging the page.
+    storage.setMaxOperationRetryTime(8000);
+    storage.setMaxUploadRetryTime(8000);
   }
 
   function dealFromDoc(doc) {
