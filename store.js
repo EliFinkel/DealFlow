@@ -1,24 +1,16 @@
-// Data layer: reads and writes deals through Firestore, and deal files
-// through Firebase Storage. This is the real, shared, multi-user database —
-// every signed-in teammate reads and writes the same data.
+// Data layer: reads and writes deals through Firestore. This is the real,
+// shared, multi-user database — every signed-in teammate reads and writes
+// the same data.
 //
 //   - "deals" collection: one document per deal (never deleted, only
 //     archived, so history survives forever)
 //   - "logs" collection: append-only history of every change
-//   - Storage path "deal-files/<deal id>/<filename>": attachments
 
 const FirebaseStore = (() => {
   let db = null;
-  let storage = null;
 
   async function init() {
     db = firebase.firestore();
-    storage = firebase.storage();
-    // Storage may be unprovisioned (it needs the Blaze plan). Without this,
-    // a missing bucket makes the SDK retry for ~2 minutes before failing;
-    // cap it so file calls fail fast instead of hanging the page.
-    storage.setMaxOperationRetryTime(8000);
-    storage.setMaxUploadRetryTime(8000);
   }
 
   function dealFromDoc(doc) {
@@ -69,23 +61,5 @@ const FirebaseStore = (() => {
     });
   }
 
-  // ---- Attached files ----------------------------------------------------
-
-  function dealFolder(deal) {
-    return storage.ref("deal-files/" + deal.id);
-  }
-
-  async function listFiles(deal) {
-    const res = await dealFolder(deal).listAll();
-    return Promise.all(res.items.map(async (item) => {
-      const [meta, url] = await Promise.all([item.getMetadata(), item.getDownloadURL()]);
-      return { name: item.name, size: meta.size, webUrl: url };
-    }));
-  }
-
-  async function uploadFile(deal, file) {
-    await dealFolder(deal).child(file.name).put(file);
-  }
-
-  return { init, listDeals, getDeal, addDeal, updateDeal, log, listFiles, uploadFile };
+  return { init, listDeals, getDeal, addDeal, updateDeal, log };
 })();

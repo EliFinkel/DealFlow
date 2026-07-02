@@ -34,12 +34,6 @@ function fmtWhen(iso) {
   return d.toLocaleDateString(undefined, opts);
 }
 
-function fmtSize(bytes) {
-  if (!bytes && bytes !== 0) return "";
-  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
 let toastTimer = null;
 function toast(msg, isError) {
   const t = $("toast");
@@ -105,7 +99,6 @@ const LocalStore = (() => {
           questions: "", created: now, updated: now, archived: true,
         },
       ],
-      files: {},
     };
   }
 
@@ -139,12 +132,6 @@ const LocalStore = (() => {
       save(d);
     },
     async log() {},
-    async listFiles(deal) { return (load().files[deal.id] || []); },
-    async uploadFile(deal, file) {
-      const d = load();
-      (d.files[deal.id] = d.files[deal.id] || []).push({ name: file.name, size: file.size, webUrl: null });
-      save(d);
-    },
   };
 })();
 

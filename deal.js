@@ -54,47 +54,6 @@ function fillForm(deal) {
   $("archive-btn").classList.toggle("hidden", isNew);
 }
 
-// True when a Storage error means the bucket isn't provisioned (Spark plan),
-// rather than a transient network problem.
-function storageUnavailable(e) {
-  const s = ((e && e.code) || "") + " " + ((e && e.message) || "");
-  return /404|not found|object-not-found|bucket-not-found|retry-limit-exceeded|storage\/unknown/i.test(s);
-}
-
-async function renderFiles() {
-  const list = $("file-list");
-  list.replaceChildren();
-  const hint = $("files-hint");
-  $("upload-row").classList.toggle("hidden", isNew);
-  hint.textContent = isNew ? "Save the deal first, then attach files." : "";
-  if (isNew) return;
-
-  let files = [];
-  try {
-    files = await store.listFiles(current);
-  } catch (e) {
-    hint.textContent = storageUnavailable(e)
-      ? "File attachments aren't available yet — Firebase Storage isn't enabled on this project (it needs the Blaze plan)."
-      : "Couldn't load files: " + e.message;
-    return;
-  }
-  if (files.length === 0) hint.textContent = "No files attached.";
-  files.forEach((f) => {
-    const row = el("div", "file-row");
-    if (f.webUrl) {
-      const a = el("a", "file-name", f.name);
-      a.href = f.webUrl;
-      a.target = "_blank";
-      a.rel = "noopener";
-      row.appendChild(a);
-    } else {
-      row.appendChild(el("span", "file-name", f.name));
-    }
-    row.appendChild(el("span", "file-size mono", fmtSize(f.size)));
-    list.appendChild(row);
-  });
-}
-
 async function save() {
   const deal = readForm();
   if (!deal.company) {
@@ -135,29 +94,9 @@ async function toggleArchive() {
   goHome();
 }
 
-async function uploadFiles(fileList) {
-  try {
-    for (const file of fileList) {
-      await action("Uploading " + file.name + "…", () => store.uploadFile(current, file));
-      await store.log("File added", current.company, file.name).catch(() => {});
-    }
-  } catch (e) {
-    if (storageUnavailable(e)) {
-      toast("Can't attach files — Firebase Storage isn't enabled on this project (needs the Blaze plan).", true);
-    }
-    return;
-  }
-  toast(fileList.length > 1 ? fileList.length + " files attached." : "File attached.");
-  renderFiles();
-}
-
 function wireEvents() {
   $("save-btn").onclick = () => save().catch(() => {});
   $("archive-btn").onclick = () => toggleArchive().catch(() => {});
-  $("file-input").onchange = (e) => {
-    if (e.target.files.length) uploadFiles([...e.target.files]).catch(() => {});
-    e.target.value = "";
-  };
 }
 
 async function boot() {
@@ -181,11 +120,8 @@ async function boot() {
   }
 
   fillForm(current);
-  // Show the deal immediately. Files load in the background so a slow or
-  // unavailable Storage bucket can never blank the page.
   $("deal-shell").classList.remove("hidden");
   fieldInput("company").focus();
-  renderFiles().catch((e) => console.error("file load failed", e));
 }
 
 boot().catch((e) => {
