@@ -54,6 +54,13 @@ function fillForm(deal) {
   $("archive-btn").classList.toggle("hidden", isNew);
 }
 
+// True when a Storage error means the bucket isn't provisioned (Spark plan),
+// rather than a transient network problem.
+function storageUnavailable(e) {
+  const s = ((e && e.code) || "") + " " + ((e && e.message) || "");
+  return /404|not found|object-not-found|bucket-not-found|retry-limit-exceeded|storage\/unknown/i.test(s);
+}
+
 async function renderFiles() {
   const list = $("file-list");
   list.replaceChildren();
@@ -66,9 +73,8 @@ async function renderFiles() {
   try {
     files = await store.listFiles(current);
   } catch (e) {
-    const missingBucket = /404|not found|object-not-found|bucket/i.test(e.message || "");
-    hint.textContent = missingBucket
-      ? "File attachments aren't available yet — Firebase Storage isn't enabled on this project."
+    hint.textContent = storageUnavailable(e)
+      ? "File attachments aren't available yet — Firebase Storage isn't enabled on this project (it needs the Blaze plan)."
       : "Couldn't load files: " + e.message;
     return;
   }
@@ -130,9 +136,16 @@ async function toggleArchive() {
 }
 
 async function uploadFiles(fileList) {
-  for (const file of fileList) {
-    await action("Uploading " + file.name + "…", () => store.uploadFile(current, file));
-    await store.log("File added", current.company, file.name).catch(() => {});
+  try {
+    for (const file of fileList) {
+      await action("Uploading " + file.name + "…", () => store.uploadFile(current, file));
+      await store.log("File added", current.company, file.name).catch(() => {});
+    }
+  } catch (e) {
+    if (storageUnavailable(e)) {
+      toast("Can't attach files — Firebase Storage isn't enabled on this project (needs the Blaze plan).", true);
+    }
+    return;
   }
   toast(fileList.length > 1 ? fileList.length + " files attached." : "File attached.");
   renderFiles();
