@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Dealflow</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='%231A2420'/><rect x='22' y='24' width='10' height='52' fill='%232B8A78'/><rect x='45' y='24' width='33' height='9' fill='%23F2F3F1'/><rect x='45' y='45' width='33' height='9' fill='%23F2F3F1'/><rect x='45' y='66' width='23' height='9' fill='%23F2F3F1'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Sign-in (only shown once config.js has real Firebase project values) -->
+  <div id="signin-screen" class="screen hidden">
+    <div class="signin-card">
+      <div class="wordmark"><span class="firm-name">Firm</span> · Dealflow</div>
+      <h1>The pipeline, in one place.</h1>
+      <p>Sign in with the account your firm set up for you. Don't have one?
+         Ask whoever administers the pipeline to create it.</p>
+      <form id="signin-form">
+        <label>Email <input id="signin-email" type="email" autocomplete="username" required></label>
+        <label>Password <input id="signin-password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="btn primary">Sign in</button>
+      </form>
+      <button id="forgot-btn" class="btn quiet" type="button">Forgot password?</button>
+      <p id="signin-error" class="hint error hidden"></p>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="hidden">
+    <div id="local-banner" class="hidden">
+      Working locally — data is saved in this browser only, nothing is shared
+      with teammates yet. See <span class="mono">SETUP.md</span> when you're ready to connect the team's shared database.
+    </div>
+
+    <header class="topbar">
+      <div class="wordmark"><span class="firm-name">Firm</span> · Dealflow</div>
+      <input id="search" type="search" placeholder="Search companies, founders, notes…" autocomplete="off">
+      <a id="new-deal-btn" class="btn primary" href="deal.html?new=1">+ New deal</a>
+      <div id="user-chip" class="hidden">
+        <span id="user-name" class="mono"></span>
+        <button id="signout-btn" class="btn quiet">Sign out</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div id="status-chips"></div>
+      <div class="toolbar-right">
+        <div class="view-toggle" role="tablist">
+          <button data-view="active" class="on">Active</button>
+          <button data-view="archived">Archive</button>
+        </div>
+        <button id="refresh-btn" class="btn quiet" title="Refresh from the spreadsheet">Refresh</button>
+      </div>
+    </div>
+
+    <main>
+      <div id="cards"></div>
+      <p id="empty-state" class="hidden"></p>
+    </main>
+  </div>
+
+  <div id="toast" class="hidden" role="status"></div>
+  <div id="loading" class="hidden"><span class="spinner"></span><span id="loading-label">Loading…</span></div>
+
+  <script src="config.js"></script>
+  <script src="vendor/firebase-app-compat.js"></script>
+  <script src="vendor/firebase-auth-compat.js"></script>
+  <script src="vendor/firebase-firestore-compat.js"></script>
+  <script src="vendor/firebase-storage-compat.js"></script>
+  <script src="auth.js"></script>
+  <script src="store.js"></script>
+  <script src="common.js"></script>
+  <script src="board.js"></script>
+</body>
+</html>
