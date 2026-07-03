@@ -1,7 +1,8 @@
-// Firebase Authentication wrapper. Accounts are created for teammates by
-// whoever administers the Firebase project (SETUP.md) — there is no
-// self-signup in the app itself, so only people the admin has added can
-// ever sign in.
+// Firebase Authentication wrapper. Teammates can register themselves from
+// the sign-in screen, but a new account can't see any data until an admin
+// approves it (the Firestore security rules in SETUP.md check the
+// allowedUsers collection on every read and write — approval is enforced
+// by the database, not by this page).
 
 const Auth = (() => {
   let auth = null;
@@ -31,6 +32,8 @@ const Auth = (() => {
       case "auth/wrong-password":
       case "auth/invalid-credential": return "Email or password is incorrect.";
       case "auth/too-many-requests": return "Too many attempts — wait a bit and try again.";
+      case "auth/email-already-in-use": return "An account with this email already exists — sign in instead.";
+      case "auth/weak-password": return "Password is too weak — use at least 6 characters.";
       default: return err.message || "Couldn't sign in.";
     }
   }
@@ -38,6 +41,16 @@ const Auth = (() => {
   async function signIn(email, password) {
     try {
       await auth.signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      throw new Error(friendlyError(err));
+    }
+  }
+
+  // Creates the account and signs it in. Access to data still requires
+  // admin approval — see the security rules.
+  async function register(email, password) {
+    try {
+      await auth.createUserWithEmailAndPassword(email, password);
     } catch (err) {
       throw new Error(friendlyError(err));
     }
@@ -59,5 +72,9 @@ const Auth = (() => {
     return auth.currentUser ? auth.currentUser.email : "Unknown";
   }
 
-  return { isConfigured, init, signIn, signOut, sendPasswordReset, userEmail };
+  function userId() {
+    return auth.currentUser ? auth.currentUser.uid : null;
+  }
+
+  return { isConfigured, init, signIn, register, signOut, sendPasswordReset, userEmail, userId };
 })();

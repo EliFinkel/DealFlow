@@ -17,8 +17,10 @@ per-teammate sign-in are fully built but switched off — see
   doesn't sleep or expire, locked down so only accounts you create can
   read or write.
 - **Files (once connected):** Firebase Storage, one folder per deal.
-- **Sign-in (once connected):** email + password, accounts created by
-  whoever administers the pipeline — no public sign-up.
+- **Sign-in (once connected):** email + password. New teammates register
+  themselves via "Request access" on the sign-in screen, but see nothing
+  until an admin approves them from the in-app Admin panel — enforced by
+  the database's security rules, not just the page.
 
 **To set it up or fix something, read [SETUP.md](SETUP.md).**
 The only file that ever needs editing is `config.js`.

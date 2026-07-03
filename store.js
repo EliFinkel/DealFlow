@@ -69,5 +69,61 @@ const FirebaseStore = (() => {
     });
   }
 
-  return { init, listDeals, getDeal, addDeal, updateDeal, deleteDeal, log };
+  // ---- Access control -------------------------------------------------
+  // Approval lives in the "allowedUsers" collection (one doc per uid);
+  // registration requests land in "accessRequests". The security rules
+  // in SETUP.md are what actually enforce this — deals and logs are
+  // unreadable until an allowedUsers doc for your uid exists.
+
+  async function myAccess() {
+    const doc = await db.collection("allowedUsers").doc(Auth.userId()).get();
+    return doc.exists
+      ? { allowed: true, role: doc.data().role || "member" }
+      : { allowed: false };
+  }
+
+  async function requestAccess() {
+    await db.collection("accessRequests").doc(Auth.userId()).set({
+      email: Auth.userEmail(),
+      requested: new Date().toISOString(),
+    });
+  }
+
+  async function listAccessRequests() {
+    const snap = await db.collection("accessRequests").get();
+    return snap.docs
+      .map((d) => ({ uid: d.id, email: d.data().email || "", requested: d.data().requested || "" }))
+      .sort((a, b) => (a.requested || "").localeCompare(b.requested || ""));
+  }
+
+  async function listAllowedUsers() {
+    const snap = await db.collection("allowedUsers").get();
+    return snap.docs
+      .map((d) => ({ uid: d.id, email: d.data().email || "", role: d.data().role || "member" }))
+      .sort((a, b) => a.email.localeCompare(b.email));
+  }
+
+  async function approveUser(uid, email) {
+    await db.collection("allowedUsers").doc(uid).set({
+      email,
+      role: "member",
+      added: new Date().toISOString(),
+      addedBy: Auth.userEmail(),
+    });
+    await db.collection("accessRequests").doc(uid).delete();
+  }
+
+  async function declineRequest(uid) {
+    await db.collection("accessRequests").doc(uid).delete();
+  }
+
+  async function removeUser(uid) {
+    await db.collection("allowedUsers").doc(uid).delete();
+  }
+
+  return {
+    init, listDeals, getDeal, addDeal, updateDeal, deleteDeal, log,
+    myAccess, requestAccess, listAccessRequests, listAllowedUsers,
+    approveUser, declineRequest, removeUser,
+  };
 })();

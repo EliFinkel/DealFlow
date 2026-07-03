@@ -13,20 +13,34 @@
 </head>
 <body>
 
-  <!-- Sign-in (only shown once config.js has real Firebase project values) -->
+  <!-- Sign-in / register (only shown once config.js has real Firebase project values) -->
   <div id="signin-screen" class="screen hidden">
     <div class="signin-card">
       <div class="wordmark"><span class="logomark" aria-hidden="true">A</span><span class="firm-name">Firm</span><span class="wordmark-sep">·</span>Dealflow</div>
-      <h1>The pipeline, in one place.</h1>
-      <p>Sign in with the account your firm set up for you. Don't have one?
-         Ask whoever administers the pipeline to create it.</p>
+      <h1 id="signin-title">The pipeline, in one place.</h1>
+      <p id="signin-sub">Sign in with your team account.</p>
       <form id="signin-form">
         <label>Email <input id="signin-email" type="email" autocomplete="username" required></label>
         <label>Password <input id="signin-password" type="password" autocomplete="current-password" required></label>
-        <button type="submit" class="btn primary">Sign in</button>
+        <button id="signin-submit" type="submit" class="btn primary">Sign in</button>
       </form>
-      <button id="forgot-btn" class="btn quiet" type="button">Forgot password?</button>
+      <div class="signin-links">
+        <button id="mode-btn" class="btn quiet" type="button">New here? Request access</button>
+        <button id="forgot-btn" class="btn quiet" type="button">Forgot password?</button>
+      </div>
       <p id="signin-error" class="hint error hidden"></p>
+    </div>
+  </div>
+
+  <!-- Signed in, waiting for an admin to approve -->
+  <div id="pending-screen" class="screen hidden">
+    <div class="signin-card">
+      <div class="wordmark"><span class="logomark" aria-hidden="true">A</span><span class="firm-name">Firm</span><span class="wordmark-sep">·</span>Dealflow</div>
+      <h1>Request sent.</h1>
+      <p>Your account <strong id="pending-email"></strong> is waiting for approval.
+         An admin on your team can let you in from their Admin panel — check back
+         after they've approved you.</p>
+      <button id="pending-signout" class="btn ghost" type="button">Sign out</button>
     </div>
   </div>
 
@@ -42,6 +56,7 @@
       <input id="search" type="search" placeholder="Search companies, founders, notes…" autocomplete="off">
       <button id="new-deal-btn" class="btn primary" type="button">+ New deal</button>
       <div id="user-chip" class="hidden">
+        <button id="admin-btn" class="btn quiet hidden" type="button">Admin</button>
         <span id="user-name" class="mono"></span>
         <button id="signout-btn" class="btn quiet">Sign out</button>
       </div>
@@ -106,6 +121,31 @@
           <button id="delete-btn" class="btn ghost danger-ghost hidden" type="button">Delete</button>
         </div>
         <button id="save-btn" class="btn primary" type="button">Save</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Admin drawer: approve access requests, manage the team -->
+  <div id="admin-overlay" class="drawer-overlay">
+    <aside class="drawer" role="dialog" aria-modal="true" aria-label="Team access">
+      <div class="drawer-head">
+        <div class="drawer-head-top">
+          <p class="mono eyebrow">Admin</p>
+          <button id="admin-close" class="icon-btn" type="button" title="Close (Esc)" aria-label="Close">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+        <h2 class="drawer-title">Team access</h2>
+      </div>
+      <div class="drawer-body">
+        <section class="admin-sec">
+          <h3>Waiting for approval</h3>
+          <div id="req-list"></div>
+        </section>
+        <section class="admin-sec">
+          <h3>Team</h3>
+          <div id="user-list"></div>
+        </section>
       </div>
     </aside>
   </div>

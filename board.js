@@ -53,6 +53,7 @@ const state = {
   statusFilter: null,   // status name, or null = all
   query: "",
   userName: "You",      // default owner for new deals
+  isAdmin: false,
 };
 
 function visibleDeals() {
@@ -509,6 +510,7 @@ function wireEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeStatusMenus();
+    if ($("admin-overlay").classList.contains("open")) { closeAdmin(); return; }
     if (drawerIsOpen()) closeDrawer().catch(() => {});
   });
   $("refresh-btn").onclick = () => reload();
@@ -525,6 +527,11 @@ function wireEvents() {
   $("archive-btn").onclick = () => drawerArchive().catch(() => {});
   $("delete-btn").onclick = () => drawerDelete().catch(() => {});
   fieldInput("status").onchange = () => paintStatusPill();
+
+  // Admin drawer
+  $("admin-btn").onclick = () => openAdmin().catch(() => {});
+  $("admin-close").onclick = () => closeAdmin();
+  $("admin-overlay").onclick = (e) => { if (e.target === $("admin-overlay")) closeAdmin(); };
   $("ai-new").onkeydown = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -536,19 +543,57 @@ function wireEvents() {
   };
 }
 
+function signOutAndReload() {
+  Auth.signOut().then(() => window.location.reload());
+}
+
 async function enterApp(resolved) {
   state.store = resolved.store;
   state.userName = resolved.local ? "You" : resolved.userName;
+
   if (resolved.local) {
     $("local-banner").classList.remove("hidden");
   } else {
+    // The gate: no allowedUsers doc means the security rules block all
+    // data, so park on the pending screen. (The rules enforce this even
+    // if this check were bypassed — see SETUP.md.)
+    const access = await action("Checking access…", () => FirebaseStore.myAccess());
+    if (!access.allowed) {
+      await FirebaseStore.requestAccess().catch(() => {}); // already requested = fine
+      $("signin-screen").classList.add("hidden");
+      $("pending-email").textContent = Auth.userEmail();
+      $("pending-screen").classList.remove("hidden");
+      $("pending-signout").onclick = () => signOutAndReload();
+      return;
+    }
+    state.isAdmin = access.role === "admin";
+    $("admin-btn").classList.toggle("hidden", !state.isAdmin);
     $("user-chip").classList.remove("hidden");
     $("user-name").textContent = resolved.userName;
-    $("signout-btn").onclick = () => Auth.signOut();
+    $("signout-btn").onclick = () => signOutAndReload();
   }
+
   $("signin-screen").classList.add("hidden");
   $("app").classList.remove("hidden");
   await reload();
+}
+
+// ---- Sign in / request access ----------------------------------------
+
+let signinMode = "signin"; // "signin" | "register"
+
+function setSigninMode(mode) {
+  signinMode = mode;
+  const reg = mode === "register";
+  $("signin-title").textContent = reg ? "Request access." : "The pipeline, in one place.";
+  $("signin-sub").textContent = reg
+    ? "Create an account with your work email. An admin on the team approves you before any deals are visible."
+    : "Sign in with your team account.";
+  $("signin-submit").textContent = reg ? "Create account & request access" : "Sign in";
+  $("mode-btn").textContent = reg ? "Have an account? Sign in" : "New here? Request access";
+  $("forgot-btn").classList.toggle("hidden", reg);
+  $("signin-password").setAttribute("autocomplete", reg ? "new-password" : "current-password");
+  $("signin-error").classList.add("hidden");
 }
 
 async function trySignIn() {
@@ -556,13 +601,104 @@ async function trySignIn() {
   const password = $("signin-password").value;
   $("signin-error").classList.add("hidden");
   try {
-    await action("Signing in…", () => Auth.signIn(email, password));
+    if (signinMode === "register") {
+      await action("Creating your account…", () => Auth.register(email, password));
+    } else {
+      await action("Signing in…", () => Auth.signIn(email, password));
+    }
     await action("Opening the pipeline…", () => FirebaseStore.init());
     await enterApp({ store: FirebaseStore, local: false, userName: Auth.userEmail() });
   } catch (e) {
     $("signin-error").textContent = e.message;
     $("signin-error").classList.remove("hidden");
   }
+}
+
+// ---- Admin: approve requests, manage the team -------------------------
+
+async function loadAdminLists() {
+  const [reqs, users] = await action("Loading team…", () =>
+    Promise.all([state.store.listAccessRequests(), state.store.listAllowedUsers()]));
+  renderAdminLists(reqs, users);
+}
+
+function renderAdminLists(reqs, users) {
+  const rw = $("req-list");
+  rw.replaceChildren();
+  if (!reqs.length) rw.appendChild(el("p", "admin-empty", "No one is waiting."));
+  reqs.forEach((r) => {
+    const row = el("div", "admin-row");
+    const info = el("div", "admin-info");
+    info.append(el("span", "admin-email", r.email), el("span", "admin-sub mono", "asked " + fmtWhen(r.requested)));
+    const acts = el("div", "admin-acts");
+    const decline = el("button", "btn ghost small", "Decline");
+    decline.type = "button";
+    decline.onclick = () => declineRequest(r).catch(() => {});
+    const approve = el("button", "btn primary small", "Approve");
+    approve.type = "button";
+    approve.onclick = () => approveRequest(r).catch(() => {});
+    acts.append(decline, approve);
+    row.append(info, acts);
+    rw.appendChild(row);
+  });
+
+  const uw = $("user-list");
+  uw.replaceChildren();
+  users.forEach((u) => {
+    const row = el("div", "admin-row");
+    const info = el("div", "admin-info");
+    info.append(el("span", "admin-email", u.email), el("span", "admin-sub mono", u.role));
+    row.appendChild(info);
+    if (u.uid === Auth.userId()) {
+      row.appendChild(el("span", "admin-sub mono", "you"));
+    } else {
+      const rm = el("button", "btn ghost danger-ghost small", "Remove");
+      rm.type = "button";
+      rm.onclick = () => removeMember(u).catch(() => {});
+      row.appendChild(rm);
+    }
+    uw.appendChild(row);
+  });
+}
+
+async function approveRequest(r) {
+  await action("Approving…", () => state.store.approveUser(r.uid, r.email));
+  toast(r.email + " can now use the pipeline.");
+  await loadAdminLists();
+}
+
+async function declineRequest(r) {
+  const yes = await confirmDialog({
+    title: "Decline " + r.email + "?",
+    message: "They keep their account but can't see any deals. They can ask again by signing in.",
+    confirmLabel: "Decline",
+  });
+  if (!yes) return;
+  await action("Declining…", () => state.store.declineRequest(r.uid));
+  await loadAdminLists();
+}
+
+async function removeMember(u) {
+  const yes = await confirmDialog({
+    title: "Remove " + u.email + "?",
+    message: "They immediately lose access to all deals. You can approve them again later.",
+    confirmLabel: "Remove",
+    danger: true,
+  });
+  if (!yes) return;
+  await action("Removing…", () => state.store.removeUser(u.uid));
+  await loadAdminLists();
+}
+
+async function openAdmin() {
+  await loadAdminLists();
+  $("admin-overlay").classList.add("open");
+  document.body.classList.add("no-scroll");
+}
+
+function closeAdmin() {
+  $("admin-overlay").classList.remove("open");
+  document.body.classList.remove("no-scroll");
 }
 
 async function tryReset() {
@@ -593,6 +729,7 @@ async function boot() {
     $("signin-screen").classList.remove("hidden");
     $("signin-form").onsubmit = (e) => { e.preventDefault(); trySignIn().catch(() => {}); };
     $("forgot-btn").onclick = () => tryReset().catch(() => {});
+    $("mode-btn").onclick = () => setSigninMode(signinMode === "signin" ? "register" : "signin");
     return;
   }
 

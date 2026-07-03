@@ -77,9 +77,13 @@ In the left sidebar of the Firebase console:
 
 ### Lock the data down to your team
 
-By default a fresh database denies everyone — you need to explicitly allow
-signed-in users. This is the step that makes the app **secure**: only people
-you've created an account for (Step 4) can read or write anything.
+This is the step that makes the app **secure**. Anyone can create an
+account from the sign-in screen ("Request access"), but these rules mean
+a new account can see **nothing** until you approve it from the Admin
+panel inside the app. The approval list lives in an `allowedUsers`
+collection that only admins can change, and the database itself checks
+it on every single read and write — so the protection holds even if
+someone bypasses the app entirely.
 
 4. Still in **Firestore Database**, click the **Rules** tab, replace
    everything with this, and click **Publish**:
@@ -87,20 +91,58 @@ you've created an account for (Step 4) can read or write anything.
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
-       match /{document=**} {
-         allow read, write: if request.auth != null;
+
+       function isSignedIn() {
+         return request.auth != null;
+       }
+       // Approved teammate: their allowedUsers doc exists.
+       function isAllowed() {
+         return isSignedIn() &&
+           exists(/databases/$(database)/documents/allowedUsers/$(request.auth.uid));
+       }
+       // Admin: their allowedUsers doc says role "admin".
+       function isAdmin() {
+         return isSignedIn() &&
+           get(/databases/$(database)/documents/allowedUsers/$(request.auth.uid)).data.role == 'admin';
+       }
+
+       // Deals and the change log: approved teammates only.
+       match /deals/{dealId} {
+         allow read, write: if isAllowed();
+       }
+       match /logs/{logId} {
+         allow read, create: if isAllowed();
+       }
+
+       // The approval list: everyone may check their own status;
+       // only admins manage it. Admins can't remove themselves,
+       // so you can never lock yourself out by mistake.
+       match /allowedUsers/{uid} {
+         allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+         allow list, create, update: if isAdmin();
+         allow delete: if isAdmin() && request.auth.uid != uid;
+       }
+
+       // Access requests: a new account may file exactly one, for
+       // itself, with its own email. Only admins can see or clear them.
+       match /accessRequests/{uid} {
+         allow create: if isSignedIn() && request.auth.uid == uid
+                       && request.resource.data.email == request.auth.token.email;
+         allow get: if isSignedIn() && request.auth.uid == uid;
+         allow list, delete: if isAdmin();
        }
      }
    }
    ```
 5. In **Storage**, click the **Rules** tab, replace everything with this,
-   and click **Publish**:
+   and click **Publish** (same idea — approved teammates only):
    ```
    rules_version = '2';
    service firebase.storage {
      match /b/{bucket}/o {
        match /{allPaths=**} {
-         allow read, write: if request.auth != null;
+         allow read, write: if request.auth != null
+           && firestore.exists(/databases/(default)/documents/allowedUsers/$(request.auth.uid));
        }
      }
    }
@@ -108,18 +150,33 @@ you've created an account for (Step 4) can read or write anything.
 
 ---
 
-## Step 4 — Create a login for each teammate
+## Step 4 — Make yourself the admin (one-time)
 
-There's no sign-up screen in the app on purpose — you create accounts, so
-only people you've actually added can ever get in.
+Teammates request access from the sign-in screen and you approve them
+inside the app — but the very first admin (you) has to be created by
+hand, once:
 
-1. **Build → Authentication → Users** tab → **Add user**.
-2. Enter each teammate's email and a temporary password, and click **Add
-   user**. Repeat for everyone who needs access (including yourself).
-3. Send each person their email + temporary password. The sign-in screen has
-   a **Forgot password?** link they can use to set their own password on
-   first login (it emails them a reset link — no setup needed, Firebase
-   handles this automatically).
+1. Open the app and use **"New here? Request access"** to create your own
+   account, or add yourself under **Build → Authentication → Users** →
+   **Add user**.
+2. In the Firebase console, go to **Build → Authentication → Users** and
+   copy your **User UID** (hover the row → copy icon).
+3. Go to **Build → Firestore Database → Data** → **Start collection** →
+   Collection ID: `allowedUsers` → for Document ID, **paste your UID** →
+   add two fields:
+   - `email` (string): your email
+   - `role` (string): `admin`
+   → **Save**.
+
+That's it. From now on, when someone registers, an **Admin** button
+appears in your top bar — open it to approve or decline requests, and to
+remove teammates later. (To make a second admin, approve them in the app,
+then edit their `allowedUsers` doc in the console and change `role` to
+`admin`.)
+
+Anyone you approve can use **Forgot password?** on the sign-in screen if
+they ever lose their password — Firebase emails them a reset link
+automatically.
 
 ---
 
