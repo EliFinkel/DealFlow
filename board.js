@@ -50,7 +50,7 @@ function renderCards() {
     empty.textContent = state.query || state.statusFilter
       ? "No deals match — clear the search or filters."
       : state.view === "archived"
-        ? "Nothing archived yet. Archived deals stay here forever."
+        ? "Nothing archived yet."
         : "No deals in the pipeline. Add the first one.";
     empty.classList.remove("hidden");
   } else {
