@@ -18,7 +18,7 @@ function el(tag, className, text) {
 
 function statusColor(name) {
   const s = cfg.statuses.find((x) => x.name === name);
-  return s ? s.color : "#8A8578";
+  return s ? s.color : "#98939E";
 }
 
 function fmtWhen(iso) {
@@ -81,6 +81,10 @@ const LocalStore = (() => {
           sector: "Robotics", source: "Intro — portfolio founder", owner: "You",
           notes: "Strong pilot data with two 3PLs. Pricing model is the wedge.",
           questions: "What's the real service cost per unit?\nReference calls with pilot customers.",
+          actionItems: [
+            { id: "A-1", text: "Reference call with pilot 3PL ops lead", done: false },
+            { id: "A-2", text: "Get unit economics model from Maya", done: true },
+          ],
           created: now, updated: now, archived: false,
         },
         {
@@ -88,7 +92,7 @@ const LocalStore = (() => {
           oneLiner: "Automated fund admin for emerging VC managers",
           founders: "Sam Peretz", status: "New",
           sector: "Fintech", source: "Cold inbound", owner: "You",
-          notes: "", questions: "", created: now, updated: now, archived: false,
+          notes: "", questions: "", actionItems: [], created: now, updated: now, archived: false,
         },
         {
           id: "D-DEMO3", company: "Verdant AI",
@@ -96,7 +100,7 @@ const LocalStore = (() => {
           founders: "Dana Ron, Ali Nassar", status: "Passed",
           sector: "AgTech", source: "Conference — AgriNext", owner: "You",
           notes: "Great team, market too small for fund thesis. Revisit if they expand to insurance.",
-          questions: "", created: now, updated: now, archived: true,
+          questions: "", actionItems: [], created: now, updated: now, archived: true,
         },
       ],
     };
@@ -129,6 +133,11 @@ const LocalStore = (() => {
       const d = load();
       const i = d.deals.findIndex((x) => x.id === deal.id);
       if (i !== -1) d.deals[i] = deal;
+      save(d);
+    },
+    async deleteDeal(id) {
+      const d = load();
+      d.deals = d.deals.filter((x) => x.id !== id);
       save(d);
     },
     async log() {},

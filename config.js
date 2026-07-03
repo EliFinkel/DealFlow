@@ -22,11 +22,12 @@ window.PIPELINE_CONFIG = {
   // Pipeline stages. Edit freely — order here is the order of the
   // filter chips. `color` is the tab color on each deal card.
   statuses: [
-    { name: "New", color: "#5B6ABF" },
-    { name: "In Review", color: "#B27A2B" },
-    { name: "Diligence", color: "#7A5BA6" },
-    { name: "Term Sheet", color: "#2B8A78" },
-    { name: "Invested", color: "#3D7A3D" },
-    { name: "Passed", color: "#8A8578" },
+    { name: "New", color: "#6E7FB2" },
+    { name: "In Review", color: "#B08A45" },
+    { name: "Diligence", color: "#8A5FA0" },
+    { name: "Term Sheet", color: "#3E8A7A" },
+    { name: "Invested", color: "#4C8A55" },
+    { name: "Passed", color: "#98939E" },
+    { name: "AION", color: "#A64E79" },
   ],
 };

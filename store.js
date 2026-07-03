@@ -2,8 +2,8 @@
 // shared, multi-user database — every signed-in teammate reads and writes
 // the same data.
 //
-//   - "deals" collection: one document per deal (never deleted, only
-//     archived, so history survives forever)
+//   - "deals" collection: one document per deal (archived rather than
+//     deleted in day-to-day use; permanent delete only from the Archive)
 //   - "logs" collection: append-only history of every change
 
 const FirebaseStore = (() => {
@@ -20,6 +20,9 @@ const FirebaseStore = (() => {
       company: d.company || "", oneLiner: d.oneLiner || "", founders: d.founders || "",
       status: d.status || "", sector: d.sector || "", source: d.source || "", owner: d.owner || "",
       notes: d.notes || "", questions: d.questions || "",
+      actionItems: Array.isArray(d.actionItems)
+        ? d.actionItems.map((i) => ({ id: i.id || "", text: i.text || "", done: !!i.done }))
+        : [],
       created: d.created || "", updated: d.updated || "", archived: Boolean(d.archived),
     };
   }
@@ -29,6 +32,7 @@ const FirebaseStore = (() => {
       company: deal.company, oneLiner: deal.oneLiner, founders: deal.founders, status: deal.status,
       sector: deal.sector, source: deal.source, owner: deal.owner,
       notes: deal.notes, questions: deal.questions,
+      actionItems: (deal.actionItems || []).map((i) => ({ id: i.id, text: i.text, done: !!i.done })),
       created: deal.created, updated: deal.updated, archived: !!deal.archived,
     };
   }
@@ -52,6 +56,10 @@ const FirebaseStore = (() => {
     await db.collection("deals").doc(deal.id).set(dealToData(deal), { merge: true });
   }
 
+  async function deleteDeal(id) {
+    await db.collection("deals").doc(id).delete();
+  }
+
   async function log(action, company, details) {
     await db.collection("logs").add({
       timestamp: new Date().toISOString(),
@@ -61,5 +69,5 @@ const FirebaseStore = (() => {
     });
   }
 
-  return { init, listDeals, getDeal, addDeal, updateDeal, log };
+  return { init, listDeals, getDeal, addDeal, updateDeal, deleteDeal, log };
 })();

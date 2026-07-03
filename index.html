@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
   <title>Dealflow</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='%231A2420'/><rect x='22' y='24' width='10' height='52' fill='%232B8A78'/><rect x='45' y='24' width='33' height='9' fill='%23F2F3F1'/><rect x='45' y='45' width='33' height='9' fill='%23F2F3F1'/><rect x='45' y='66' width='23' height='9' fill='%23F2F3F1'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='26' fill='%2362094A'/><rect x='22' y='24' width='10' height='52' rx='5' fill='%23CEAEB4'/><rect x='45' y='24' width='33' height='9' rx='4.5' fill='%23F1F1F1'/><rect x='45' y='45' width='33' height='9' rx='4.5' fill='%23F1F1F1'/><rect x='45' y='66' width='23' height='9' rx='4.5' fill='%23F1F1F1'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,7 +16,7 @@
   <!-- Sign-in (only shown once config.js has real Firebase project values) -->
   <div id="signin-screen" class="screen hidden">
     <div class="signin-card">
-      <div class="wordmark"><span class="firm-name">Firm</span> · Dealflow</div>
+      <div class="wordmark"><span class="logomark" aria-hidden="true">A</span><span class="firm-name">Firm</span><span class="wordmark-sep">·</span>Dealflow</div>
       <h1>The pipeline, in one place.</h1>
       <p>Sign in with the account your firm set up for you. Don't have one?
          Ask whoever administers the pipeline to create it.</p>
@@ -35,9 +38,9 @@
     </div>
 
     <header class="topbar">
-      <div class="wordmark"><span class="firm-name">Firm</span> · Dealflow</div>
+      <div class="wordmark"><span class="logomark" aria-hidden="true">A</span><span class="firm-name">Firm</span><span class="wordmark-sep">·</span>Dealflow</div>
       <input id="search" type="search" placeholder="Search companies, founders, notes…" autocomplete="off">
-      <a id="new-deal-btn" class="btn primary" href="deal.html?new=1">+ New deal</a>
+      <button id="new-deal-btn" class="btn primary" type="button">+ New deal</button>
       <div id="user-chip" class="hidden">
         <span id="user-name" class="mono"></span>
         <button id="signout-btn" class="btn quiet">Sign out</button>
@@ -51,7 +54,7 @@
           <button data-view="active" class="on">Active</button>
           <button data-view="archived">Archive</button>
         </div>
-        <button id="refresh-btn" class="btn quiet" title="Refresh from the spreadsheet">Refresh</button>
+        <button id="refresh-btn" class="btn quiet" title="Reload deals">Refresh</button>
       </div>
     </div>
 
@@ -59,6 +62,64 @@
       <div id="cards"></div>
       <p id="empty-state" class="hidden"></p>
     </main>
+  </div>
+
+  <!-- Deal drawer: view and edit a deal without leaving the board -->
+  <div id="deal-overlay" class="drawer-overlay">
+    <aside class="drawer" role="dialog" aria-modal="true" aria-label="Deal details">
+      <div class="drawer-head">
+        <div class="drawer-head-top">
+          <p id="panel-id" class="mono eyebrow"></p>
+          <button id="deal-close" class="icon-btn" type="button" title="Close (Esc)" aria-label="Close">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+        <input id="f-company" class="title-input" type="text" placeholder="Company name" autocomplete="off" aria-label="Company">
+        <div class="select-pill" id="status-pill">
+          <select id="f-status" aria-label="Status"></select>
+        </div>
+      </div>
+
+      <div class="drawer-body">
+        <label>One-liner <input id="f-oneliner" type="text" placeholder="What they do, in a sentence" autocomplete="off"></label>
+        <label>Founders <input id="f-founders" type="text" placeholder="Names, roles" autocomplete="off"></label>
+
+        <div class="field-row">
+          <label>Sector <input id="f-sector" type="text" placeholder="—" autocomplete="off"></label>
+          <label>Source <input id="f-source" type="text" placeholder="How it reached us" autocomplete="off"></label>
+        </div>
+        <label>Owner <input id="f-owner" type="text" autocomplete="off"></label>
+
+        <label>Notes <textarea id="f-notes" rows="5" placeholder="What we know so far"></textarea></label>
+        <label>Open questions <textarea id="f-questions" rows="3" placeholder="What we still need to find out"></textarea></label>
+
+        <div class="ai-sec">
+          <h3>Action items</h3>
+          <div id="ai-list"></div>
+          <input id="ai-new" type="text" placeholder="+ Add action item — press Enter" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="drawer-foot">
+        <div class="drawer-foot-left">
+          <button id="archive-btn" class="btn ghost hidden" type="button">Archive</button>
+          <button id="delete-btn" class="btn ghost danger-ghost hidden" type="button">Delete</button>
+        </div>
+        <button id="save-btn" class="btn primary" type="button">Save</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Confirmation dialog (archive / delete / discard) -->
+  <div id="confirm-box" class="confirm-overlay">
+    <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h3 id="confirm-title"></h3>
+      <p id="confirm-msg"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="btn ghost" type="button">Cancel</button>
+        <button id="confirm-ok" class="btn primary" type="button"></button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="hidden" role="status"></div>

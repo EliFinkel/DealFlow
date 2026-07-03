@@ -1,9 +1,11 @@
 # Dealflow
 
 The firm's internal dealflow pipeline. A card per deal on the board
-([index.html](index.html)); click one to open its own page
-([deal.html](deal.html)) to view, edit, or create, then Save to return to the
-board. Deals are archived, never deleted, and every change is logged.
+([index.html](index.html)); click one to open it in an overlay on top of
+the board to view, edit, or create, then Save. Status and action items
+can be changed directly on the cards, and each card can be archived.
+Archived deals can be restored — or permanently deleted from the Archive
+tab. Every change is logged.
 
 **Right now this runs in local mode**: data is saved only in your own
 browser, nothing is shared with the team yet. A shared Firebase database and
