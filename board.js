@@ -652,13 +652,38 @@ function renderAdminLists(reqs, users) {
     if (u.uid === Auth.userId()) {
       row.appendChild(el("span", "admin-sub mono", "you"));
     } else {
+      const acts = el("div", "admin-acts");
+      const isAdminUser = u.role === "admin";
+      const roleBtn = el("button", "btn ghost small", isAdminUser ? "Remove admin" : "Make admin");
+      roleBtn.type = "button";
+      roleBtn.onclick = () => toggleAdminRole(u).catch(() => {});
       const rm = el("button", "btn ghost danger-ghost small", "Remove");
       rm.type = "button";
       rm.onclick = () => removeMember(u).catch(() => {});
-      row.appendChild(rm);
+      acts.append(roleBtn, rm);
+      row.appendChild(acts);
     }
     uw.appendChild(row);
   });
+}
+
+async function toggleAdminRole(u) {
+  const promote = u.role !== "admin";
+  const yes = await confirmDialog(promote
+    ? {
+        title: "Make " + u.email + " an admin?",
+        message: "They'll be able to approve and remove teammates, and make more admins.",
+        confirmLabel: "Make admin",
+      }
+    : {
+        title: "Remove admin from " + u.email + "?",
+        message: "They keep normal access to deals but lose the Admin panel.",
+        confirmLabel: "Remove admin",
+      });
+  if (!yes) return;
+  await action("Saving…", () => state.store.setUserRole(u.uid, promote ? "admin" : "member"));
+  toast(promote ? u.email + " is now an admin." : u.email + " is now a member.");
+  await loadAdminLists();
 }
 
 async function approveRequest(r) {

@@ -115,12 +115,13 @@ someone bypasses the app entirely.
        }
 
        // The approval list: everyone may check their own status;
-       // only admins manage it. Admins can't remove themselves,
-       // so you can never lock yourself out by mistake.
+       // only admins manage it. Admins can't edit or remove their own
+       // entry — so nobody can demote or delete themselves, and the
+       // team can never end up with zero admins by accident.
        match /allowedUsers/{uid} {
          allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-         allow list, create, update: if isAdmin();
-         allow delete: if isAdmin() && request.auth.uid != uid;
+         allow list, create: if isAdmin();
+         allow update, delete: if isAdmin() && request.auth.uid != uid;
        }
 
        // Access requests: a new account may file exactly one, for
@@ -169,10 +170,9 @@ hand, once:
    → **Save**.
 
 That's it. From now on, when someone registers, an **Admin** button
-appears in your top bar — open it to approve or decline requests, and to
-remove teammates later. (To make a second admin, approve them in the app,
-then edit their `allowedUsers` doc in the console and change `role` to
-`admin`.)
+appears in your top bar — open it to approve or decline requests, make
+other teammates admins (or take admin away), and remove people. The
+console is never needed again after this one bootstrap step.
 
 Anyone you approve can use **Forgot password?** on the sign-in screen if
 they ever lose their password — Firebase emails them a reset link

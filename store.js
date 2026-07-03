@@ -121,9 +121,13 @@ const FirebaseStore = (() => {
     await db.collection("allowedUsers").doc(uid).delete();
   }
 
+  async function setUserRole(uid, role) {
+    await db.collection("allowedUsers").doc(uid).set({ role }, { merge: true });
+  }
+
   return {
     init, listDeals, getDeal, addDeal, updateDeal, deleteDeal, log,
     myAccess, requestAccess, listAccessRequests, listAllowedUsers,
-    approveUser, declineRequest, removeUser,
+    approveUser, declineRequest, removeUser, setUserRole,
   };
 })();
