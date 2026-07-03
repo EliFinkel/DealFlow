@@ -82,8 +82,8 @@ const LocalStore = (() => {
           notes: "Strong pilot data with two 3PLs. Pricing model is the wedge.",
           questions: "What's the real service cost per unit?\nReference calls with pilot customers.",
           actionItems: [
-            { id: "A-1", text: "Reference call with pilot 3PL ops lead", done: false },
-            { id: "A-2", text: "Get unit economics model from Maya", done: true },
+            { id: "A-1", text: "Reference call with pilot 3PL ops lead", done: false, assignee: "You" },
+            { id: "A-2", text: "Get unit economics model from Maya", done: true, assignee: "" },
           ],
           created: now, updated: now, archived: false,
         },
@@ -141,6 +141,7 @@ const LocalStore = (() => {
       save(d);
     },
     async log() {},
+    async listLogs() { return []; },
   };
 })();
 

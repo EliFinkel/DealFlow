@@ -21,7 +21,7 @@ const FirebaseStore = (() => {
       status: d.status || "", sector: d.sector || "", source: d.source || "", owner: d.owner || "",
       notes: d.notes || "", questions: d.questions || "",
       actionItems: Array.isArray(d.actionItems)
-        ? d.actionItems.map((i) => ({ id: i.id || "", text: i.text || "", done: !!i.done }))
+        ? d.actionItems.map((i) => ({ id: i.id || "", text: i.text || "", done: !!i.done, assignee: i.assignee || "" }))
         : [],
       created: d.created || "", updated: d.updated || "", archived: Boolean(d.archived),
     };
@@ -32,7 +32,7 @@ const FirebaseStore = (() => {
       company: deal.company, oneLiner: deal.oneLiner, founders: deal.founders, status: deal.status,
       sector: deal.sector, source: deal.source, owner: deal.owner,
       notes: deal.notes, questions: deal.questions,
-      actionItems: (deal.actionItems || []).map((i) => ({ id: i.id, text: i.text, done: !!i.done })),
+      actionItems: (deal.actionItems || []).map((i) => ({ id: i.id, text: i.text, done: !!i.done, assignee: i.assignee || "" })),
       created: deal.created, updated: deal.updated, archived: !!deal.archived,
     };
   }
@@ -40,6 +40,22 @@ const FirebaseStore = (() => {
   async function listDeals() {
     const snap = await db.collection("deals").get();
     return snap.docs.map(dealFromDoc);
+  }
+
+  // Live feed of the deals collection: onData fires immediately with the
+  // current state and again on every change by anyone on the team.
+  // Returns the unsubscribe function.
+  function listenDeals(onData, onError) {
+    return db.collection("deals").onSnapshot(
+      (snap) => onData(snap.docs.map(dealFromDoc)),
+      onError
+    );
+  }
+
+  async function listLogs(max) {
+    const snap = await db.collection("logs")
+      .orderBy("timestamp", "desc").limit(max || 50).get();
+    return snap.docs.map((d) => d.data());
   }
 
   async function getDeal(id) {
@@ -126,7 +142,7 @@ const FirebaseStore = (() => {
   }
 
   return {
-    init, listDeals, getDeal, addDeal, updateDeal, deleteDeal, log,
+    init, listDeals, listenDeals, getDeal, addDeal, updateDeal, deleteDeal, log, listLogs,
     myAccess, requestAccess, listAccessRequests, listAllowedUsers,
     approveUser, declineRequest, removeUser, setUserRole,
   };

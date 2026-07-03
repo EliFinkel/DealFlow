@@ -43,6 +43,7 @@ body {
 }
 
 .hidden { display: none !important; }
+.invisible { visibility: hidden !important; }
 .no-scroll { overflow: hidden; }
 .mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0.01em; }
 .hint { color: var(--ink-3); font-size: 12.5px; }
@@ -331,6 +332,18 @@ button.pill:hover { background: color-mix(in srgb, var(--pc) 16%, white); }
   min-height: 38px;
 }
 
+.card-meta-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.stale-tag {
+  font: 600 10.5px var(--sans);
+  letter-spacing: 0.03em;
+  color: #A0752F;
+  background: rgba(176, 138, 69, 0.13);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .card-acts { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s ease; }
 .card:hover .card-acts, .card:focus-within .card-acts { opacity: 1; }
 @media (hover: none) { .card-acts { opacity: 1; } }
@@ -381,7 +394,16 @@ button.pill:hover { background: color-mix(in srgb, var(--pc) 16%, white); }
   background: var(--berry) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.4l2.3 2.3 4.5-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/11px no-repeat;
   border-color: var(--berry);
 }
-.ai-row .ai-text { min-width: 0; }
+.ai-row .ai-text { min-width: 0; flex: 1; }
+.ai-who {
+  font: 600 11px var(--sans);
+  color: var(--berry);
+  background: color-mix(in srgb, var(--berry) 7%, white);
+  border-radius: 999px;
+  padding: 1px 8px;
+  flex: none;
+  align-self: center;
+}
 .ai-row.done .ai-text {
   color: var(--ink-3);
   text-decoration: line-through;
@@ -626,6 +648,17 @@ button.pill:hover { background: color-mix(in srgb, var(--pc) 16%, white); }
 #ai-list .ai-row { align-items: center; gap: 4px; cursor: default; }
 #ai-list .ai-row input[type="checkbox"] { margin: 0 5px 0 0; width: 17px; }
 .ai-text-input { flex: 1; }
+.drawer-body select.ai-assign {
+  width: auto;
+  margin: 0;
+  padding: 4px 8px;
+  flex: none;
+  font: 600 12px var(--sans);
+  color: var(--ink-3);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.drawer-body select.ai-assign:hover { background: var(--surface-2); color: var(--ink-2); }
 #ai-list .done .ai-text-input {
   color: var(--ink-3);
   text-decoration: line-through;
@@ -660,6 +693,49 @@ button.pill:hover { background: color-mix(in srgb, var(--pc) 16%, white); }
   border-radius: 0 0 var(--r-l) var(--r-l);
 }
 .drawer-foot-left { display: flex; gap: 8px; }
+
+/* ---- "My items" view ---- */
+
+#cards.mine-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 620px;
+}
+
+.mine-group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: 14px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-s);
+}
+.mine-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+.mine-company { font: 600 16px var(--display); color: var(--ink); }
+.mine-head:hover .mine-company { color: var(--berry); }
+
+/* ---- Activity feed ---- */
+
+.act-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.act-row:last-child { border-bottom: none; }
+.act-main { font-size: 14px; color: var(--ink-2); }
+.act-main strong { color: var(--ink); font-weight: 600; }
+.act-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; overflow-wrap: anywhere; }
 
 /* ---- Admin drawer ---- */
 

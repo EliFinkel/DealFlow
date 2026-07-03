@@ -49,11 +49,13 @@ function confirmDialog(opts) {
 const state = {
   store: null,
   deals: [],
-  view: "active",       // "active" | "archived"
+  view: "active",       // "active" | "mine" | "archived"
   statusFilter: null,   // status name, or null = all
   query: "",
-  userName: "You",      // default owner for new deals
+  userName: "You",      // default owner for new deals; assignee identity
   isAdmin: false,
+  team: ["You"],        // emails for the assignee dropdown
+  unsubscribe: null,    // live listener teardown (Firebase mode only)
 };
 
 function visibleDeals() {
@@ -66,6 +68,17 @@ function visibleDeals() {
       .join(" ").toLowerCase().includes(q))
     .sort((a, b) => (b.updated || "").localeCompare(a.updated || ""));
 }
+
+function shortName(who) {
+  return !who || who === "You" ? who : who.split("@")[0];
+}
+
+function daysSince(iso) {
+  const t = new Date(iso).getTime();
+  return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 86400000);
+}
+
+const STALE_DAYS = 10;
 
 function renderChips() {
   const wrap = $("status-chips");
@@ -130,7 +143,12 @@ function renderCards() {
     card.appendChild(actionItemsSection(d));
 
     const meta = el("div", "card-meta");
-    meta.appendChild(el("span", "mono", (d.owner || "—") + " · " + fmtWhen(d.updated)));
+    const left = el("div", "card-meta-left");
+    left.appendChild(el("span", "mono", (shortName(d.owner) || "—") + " · " + fmtWhen(d.updated)));
+    if (!d.archived && daysSince(d.updated) >= STALE_DAYS) {
+      left.appendChild(el("span", "stale-tag", "quiet " + daysSince(d.updated) + "d"));
+    }
+    meta.appendChild(left);
     const acts = el("div", "card-acts");
     if (d.archived) {
       acts.appendChild(iconBtn("restore", "Restore to pipeline", () => { restoreDeal(d); }));
@@ -252,6 +270,7 @@ function actionItemsSection(d) {
     cb.checked = item.done;
     cb.onchange = () => { toggleItem(d, item, cb.checked); };
     row.append(cb, el("span", "ai-text", item.text));
+    if (item.assignee) row.appendChild(el("span", "ai-who", shortName(item.assignee)));
     sec.appendChild(row);
   });
   const add = el("input", "ai-add");
@@ -281,13 +300,13 @@ async function toggleItem(deal, item, done) {
   } catch (e) {
     item.done = !done;
   }
-  renderCards();
+  render();
 }
 
 async function addItem(deal, text) {
   const before = deal.updated;
   deal.actionItems = deal.actionItems || [];
-  deal.actionItems.push({ id: "A-" + Date.now().toString(36), text, done: false });
+  deal.actionItems.push({ id: "A-" + Date.now().toString(36), text, done: false, assignee: "" });
   deal.updated = new Date().toISOString();
   try {
     await action("Saving…", async () => {
@@ -360,11 +379,20 @@ function renderEditItems() {
     text.value = item.text;
     text.autocomplete = "off";
     text.oninput = () => { item.text = text.value; };
+    const who = el("select", "ai-assign");
+    who.title = "Assign to";
+    who.appendChild(new Option("Unassigned", ""));
+    const options = state.team.includes(item.assignee) || !item.assignee
+      ? state.team
+      : state.team.concat(item.assignee); // keep ex-teammates' names visible
+    options.forEach((t) => who.appendChild(new Option(shortName(t), t)));
+    who.value = item.assignee || "";
+    who.onchange = () => { item.assignee = who.value; };
     const del = el("button", "ai-del", "✕");
     del.type = "button";
     del.title = "Remove action item";
     del.onclick = () => { editItems.splice(i, 1); renderEditItems(); };
-    row.append(cb, text, del);
+    row.append(cb, text, who, del);
     wrap.appendChild(row);
   });
 }
@@ -491,16 +519,104 @@ async function drawerDelete() {
   await reload();
 }
 
+// "My items" view: every open action item assigned to you, grouped by deal.
+function renderMyItems() {
+  const wrap = $("cards");
+  wrap.replaceChildren();
+  const q = state.query.trim().toLowerCase();
+
+  const groups = [];
+  state.deals
+    .filter((d) => !d.archived)
+    .sort((a, b) => (b.updated || "").localeCompare(a.updated || ""))
+    .forEach((d) => {
+      const items = (d.actionItems || []).filter((i) =>
+        !i.done && (i.assignee || "") === state.userName &&
+        (!q || (i.text + " " + d.company).toLowerCase().includes(q)));
+      if (items.length) groups.push({ deal: d, items });
+    });
+
+  const empty = $("empty-state");
+  if (!groups.length) {
+    empty.textContent = q
+      ? "No action items match the search."
+      : "Nothing is assigned to you. Open a deal to assign action items.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  groups.forEach(({ deal, items }) => {
+    const sec = el("section", "mine-group");
+    const head = el("button", "mine-head");
+    head.type = "button";
+    head.onclick = () => openDeal(deal.id).catch(() => {});
+    const pill = el("span", "pill", deal.status);
+    pill.style.setProperty("--pc", statusColor(deal.status));
+    head.append(el("span", "mine-company", deal.company), pill);
+    sec.appendChild(head);
+    items.forEach((item) => {
+      const row = el("label", "ai-row");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.onchange = () => { toggleItem(deal, item, cb.checked); };
+      row.append(cb, el("span", "ai-text", item.text));
+      sec.appendChild(row);
+    });
+    wrap.appendChild(sec);
+  });
+}
+
 function render() {
   document.querySelectorAll(".view-toggle button").forEach((b) =>
     b.classList.toggle("on", b.dataset.view === state.view));
+  const mine = state.view === "mine";
+  // visibility (not display) so the toolbar keeps its size and the
+  // view toggle doesn't jump when the chips go away
+  $("status-chips").classList.toggle("invisible", mine);
+  $("cards").classList.toggle("mine-mode", mine);
   renderChips();
-  renderCards();
+  if (mine) renderMyItems();
+  else renderCards();
 }
 
 async function reload() {
+  if (state.unsubscribe) return; // live listener keeps state.deals fresh
   state.deals = await action("Loading pipeline…", () => state.store.listDeals());
   render();
+}
+
+// Re-render triggered by a live snapshot: keep the text someone is
+// mid-typing into a card's add-item input from being wiped.
+function preserveFocusRender() {
+  const ae = document.activeElement;
+  let keep = null;
+  if (ae && ae.classList && ae.classList.contains("ai-add")) {
+    const card = ae.closest("[data-deal-id]");
+    if (card) keep = { id: card.dataset.dealId, val: ae.value };
+  }
+  render();
+  if (keep) {
+    const input = document.querySelector('[data-deal-id="' + keep.id + '"] .ai-add');
+    if (input) { input.value = keep.val; input.focus(); }
+  }
+}
+
+// Firebase mode: subscribe to the deals collection. Resolves after the
+// first snapshot so boot can wait for the initial load.
+function startLive() {
+  return action("Loading pipeline…", () => new Promise((resolve, reject) => {
+    let first = true;
+    state.unsubscribe = state.store.listenDeals((deals) => {
+      state.deals = deals;
+      preserveFocusRender();
+      if (first) { first = false; resolve(); }
+    }, (err) => {
+      console.error(err);
+      if (first) { first = false; reject(err); }
+      else toast("Live updates hiccuped — changes may lag until reload.", true);
+    });
+  }));
 }
 
 function wireEvents() {
@@ -511,6 +627,7 @@ function wireEvents() {
     if (e.key !== "Escape") return;
     closeStatusMenus();
     if ($("admin-overlay").classList.contains("open")) { closeAdmin(); return; }
+    if ($("activity-overlay").classList.contains("open")) { closeActivity(); return; }
     if (drawerIsOpen()) closeDrawer().catch(() => {});
   });
   $("refresh-btn").onclick = () => reload();
@@ -532,12 +649,18 @@ function wireEvents() {
   $("admin-btn").onclick = () => openAdmin().catch(() => {});
   $("admin-close").onclick = () => closeAdmin();
   $("admin-overlay").onclick = (e) => { if (e.target === $("admin-overlay")) closeAdmin(); };
+
+  // Activity + export
+  $("activity-btn").onclick = () => openActivity().catch(() => {});
+  $("activity-close").onclick = () => closeActivity();
+  $("activity-overlay").onclick = (e) => { if (e.target === $("activity-overlay")) closeActivity(); };
+  $("export-btn").onclick = () => exportPdf();
   $("ai-new").onkeydown = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     const t = $("ai-new").value.trim();
     if (!t) return;
-    editItems.push({ id: "A-" + Date.now().toString(36), text: t, done: false });
+    editItems.push({ id: "A-" + Date.now().toString(36), text: t, done: false, assignee: "" });
     $("ai-new").value = "";
     renderEditItems();
   };
@@ -571,11 +694,20 @@ async function enterApp(resolved) {
     $("user-chip").classList.remove("hidden");
     $("user-name").textContent = resolved.userName;
     $("signout-btn").onclick = () => signOutAndReload();
+
+    // Team list feeds the assignee dropdown (needs the members-can-read
+    // allowedUsers rule from SETUP.md; falls back to just yourself).
+    const team = await FirebaseStore.listAllowedUsers().catch(() => []);
+    state.team = team.length ? team.map((u) => u.email) : [state.userName];
+
+    $("activity-btn").classList.remove("hidden");
+    $("refresh-btn").classList.add("hidden"); // live sync makes it redundant
   }
 
   $("signin-screen").classList.add("hidden");
   $("app").classList.remove("hidden");
-  await reload();
+  if (resolved.local) await reload();
+  else await startLive();
 }
 
 // ---- Sign in / request access ----------------------------------------
@@ -724,6 +856,107 @@ async function openAdmin() {
 function closeAdmin() {
   $("admin-overlay").classList.remove("open");
   document.body.classList.remove("no-scroll");
+}
+
+// ---- Activity feed -----------------------------------------------------
+
+async function openActivity() {
+  const logs = await action("Loading activity…", () => state.store.listLogs(50));
+  const list = $("activity-list");
+  list.replaceChildren();
+  if (!logs.length) {
+    list.appendChild(el("p", "admin-empty", "No activity yet — changes show up here as the team works."));
+  }
+  logs.forEach((L) => {
+    const row = el("div", "act-row");
+    const main = el("p", "act-main");
+    main.append(
+      el("strong", null, shortName(L.user || "someone")),
+      document.createTextNode(" " + (L.action || "updated").toLowerCase() + " " + (L.company || ""))
+    );
+    const subText = [L.details, fmtWhen(L.timestamp)].filter(Boolean).join(" · ");
+    row.appendChild(main);
+    if (subText) row.appendChild(el("p", "act-sub", subText));
+    list.appendChild(row);
+  });
+  $("activity-overlay").classList.add("open");
+  document.body.classList.add("no-scroll");
+}
+
+function closeActivity() {
+  $("activity-overlay").classList.remove("open");
+  document.body.classList.remove("no-scroll");
+}
+
+// ---- PDF export (opens a print-ready report; save as PDF from there) ----
+
+function exportPdf() {
+  const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const deals = state.view === "mine"
+    ? state.deals.filter((d) => !d.archived)
+    : visibleDeals();
+  if (!deals.length) { toast("Nothing to export in this view.", true); return; }
+
+  const filters = [];
+  if (state.view === "archived") filters.push("archived deals");
+  if (state.statusFilter) filters.push("status: " + state.statusFilter);
+  if (state.query.trim()) filters.push("search: “" + state.query.trim() + "”");
+
+  const blocks = deals.map((d) => {
+    const open = (d.actionItems || []).filter((i) => !i.done);
+    const doneCount = (d.actionItems || []).filter((i) => i.done).length;
+    return `
+      <section class="deal" style="border-left-color:${esc(statusColor(d.status))}">
+        <div class="head">
+          <h2>${esc(d.company)}</h2>
+          <span class="status" style="color:${esc(statusColor(d.status))}">${esc(d.status)}</span>
+        </div>
+        ${d.oneLiner ? `<p class="one">${esc(d.oneLiner)}</p>` : ""}
+        ${d.founders ? `<p class="sub">Founders: ${esc(d.founders)}</p>` : ""}
+        <p class="sub">${[d.sector && "Sector: " + d.sector, d.source && "Source: " + d.source,
+          d.owner && "Owner: " + shortName(d.owner), "Updated " + fmtWhen(d.updated)]
+          .filter(Boolean).map(esc).join("  ·  ")}</p>
+        ${open.length ? `<ul>${open.map((i) =>
+          `<li>${esc(i.text)}${i.assignee ? ` <em>— ${esc(shortName(i.assignee))}</em>` : ""}</li>`).join("")}</ul>` : ""}
+        ${doneCount ? `<p class="sub">✓ ${doneCount} action item${doneCount > 1 ? "s" : ""} done</p>` : ""}
+        ${d.notes ? `<p class="notes">${esc(d.notes)}</p>` : ""}
+      </section>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(cfg.firmName)} — Pipeline report</title>
+    <style>
+      body { font: 13px/1.5 -apple-system, "Segoe UI", sans-serif; color: #2E2733; margin: 40px; }
+      .brand { display: flex; justify-content: space-between; align-items: baseline;
+               border-bottom: 3px solid #62094A; padding-bottom: 10px; margin-bottom: 6px; }
+      .brand h1 { font-size: 20px; margin: 0; } .brand h1 b { color: #62094A; }
+      .brand span { color: #8A8292; font-size: 12px; }
+      .filters { color: #8A8292; font-size: 12px; margin: 0 0 18px; }
+      .deal { border: 1px solid #E6E3E8; border-left: 4px solid #ccc; border-radius: 8px;
+              padding: 14px 18px; margin-bottom: 14px; break-inside: avoid; }
+      .deal .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+      .deal h2 { font-size: 16px; margin: 0; }
+      .status { font-weight: 700; font-size: 12px; white-space: nowrap; }
+      .one { margin: 4px 0 2px; }
+      .sub { color: #8A8292; font-size: 11.5px; margin: 2px 0; }
+      ul { margin: 8px 0 2px; padding-left: 20px; }
+      li { margin: 2px 0; } li em { color: #81164D; font-style: normal; font-weight: 600; }
+      .notes { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed #E6E3E8; white-space: pre-wrap; }
+      @page { margin: 18mm; }
+    </style></head><body>
+    <div class="brand"><h1><b>${esc(cfg.firmName)}</b> · Dealflow</h1>
+      <span>${new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+        · ${deals.length} deal${deals.length > 1 ? "s" : ""}</span></div>
+    ${filters.length ? `<p class="filters">Filtered: ${esc(filters.join(", "))}</p>` : ""}
+    ${blocks}
+    <script>window.onload = () => setTimeout(() => window.print(), 200);<\/script>
+    </body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) { toast("Allow pop-ups for this site to export the PDF.", true); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 async function tryReset() {

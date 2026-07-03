@@ -114,13 +114,16 @@ someone bypasses the app entirely.
          allow read, create: if isAllowed();
        }
 
-       // The approval list: everyone may check their own status;
-       // only admins manage it. Admins can't edit or remove their own
-       // entry — so nobody can demote or delete themselves, and the
-       // team can never end up with zero admins by accident.
+       // The approval list: anyone signed in may check their own status,
+       // approved teammates may read the team list (it feeds the
+       // action-item assignee dropdown), and only admins change it.
+       // Admins can't edit or remove their own entry — so nobody can
+       // demote or delete themselves, and the team can never end up
+       // with zero admins by accident.
        match /allowedUsers/{uid} {
-         allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-         allow list, create: if isAdmin();
+         allow get: if isSignedIn() && (request.auth.uid == uid || isAllowed());
+         allow list: if isAllowed();
+         allow create: if isAdmin();
          allow update, delete: if isAdmin() && request.auth.uid != uid;
        }
 
